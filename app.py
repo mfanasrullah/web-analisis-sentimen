@@ -25,7 +25,7 @@ def load_logo():
         image = PILImage.open(logo_path)
         return image
     except FileNotFoundError:
-        logo_url = "https://www.polibatam.ac.id/wp-content/uploads/2024/01/01_Logo_4_W_Polibatam_Vertikal@2x-1-768x714.png"
+        logo_url = "https://www.polibatam.ac.id/wp-content/uploads/2024/01/cropped-cropped-cropped-02_Logo_1_Utama_Polibatam_Horizontal@2x.png"
         return logo_url
     except Exception as e:
         return None
