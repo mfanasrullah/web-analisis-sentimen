@@ -53,17 +53,13 @@ def load_data():
     
     df = df.dropna(subset=['pelabuhan', 'tanggal'])
     
-    # PERBAIKAN: Langsung paksa konversi ke datetime tanpa pengecekan 'if'.
-    # errors='coerce' akan mengubah data yang tidak valid menjadi NaT (Not a Time).
     df['tanggal'] = pd.to_datetime(df['tanggal'], errors='coerce')
     
-    # PERBAIKAN: Hapus zona waktu (timezone) jika ada agar tidak error saat to_period('M')
     try:
         df['tanggal'] = df['tanggal'].dt.tz_localize(None)
     except TypeError:
-        pass # Jika data sudah tidak memiliki timezone, abaikan saja
+        pass 
     
-    # Drop baris yang tanggalnya menjadi NaT setelah dikonversi
     df = df.dropna(subset=['tanggal'])
     df['bulan_tahun'] = df['tanggal'].dt.to_period('M').astype(str)
     
@@ -137,12 +133,11 @@ if len(date_range) == 2:
         (df_working['tanggal'].dt.date <= end_date)
     ]
 else:
-    st.info("Pilih tanggal akhir di sidebar untuk memperbarui dashboard.")
     df_working = pd.DataFrame(columns=df_full.columns) 
 
+# PERBAIKAN: st.stop() dihapus dari sini agar UI di bawah tetap dimuat.
 if df_working.empty:
-    st.warning("Tidak ada data yang sesuai dengan filter di sidebar.")
-    st.stop()
+    st.warning("⚠️ Tidak ada data pelabuhan yang dipilih atau sesuai rentang waktu. Pilih pelabuhan di sidebar untuk melihat visualisasi data.")
 
 # ==========================================
 # 5. BODY - HEADER SECTION (LOGO & TITLE)
@@ -164,8 +159,9 @@ st.markdown("---")
 # ==========================================
 kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
 
+# PERBAIKAN: Penanganan error jika df_working kosong agar nilai metrik menjadi 0 bukan error
 total_reviews = len(df_working)
-avg_rating = df_working['review_rating'].mean() if 'review_rating' in df_working.columns else 0
+avg_rating = df_working['review_rating'].mean() if ('review_rating' in df_working.columns and not df_working.empty) else 0
 ports_counted = df_working['pelabuhan'].nunique()
 
 with kpi_col1:
@@ -183,106 +179,115 @@ st.markdown("---")
 tab1, tab2, tab3 = st.tabs(["📊 Visualisasi Data & Tren", "☁️ WordCloud & Heatmap Keluhan", "🤖 Prediksi Sentimen AI"])
 
 with tab1:
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("#### Distribusi Popularitas (Volume Aktivitas)")
-        st.markdown("<small>Pelabuhan dengan volume aktivitas ulasan tertinggi.</small>", unsafe_allow_html=True)
-        pop_df = df_working['pelabuhan'].value_counts().reset_index()
-        pop_df.columns = ['Pelabuhan', 'Jumlah Ulasan']
+    # PERBAIKAN: Melindungi render visualisasi jika data kosong
+    if df_working.empty:
+        st.info("Pilih minimal satu pelabuhan di sidebar untuk menampilkan visualisasi grafik dan tren.")
+    else:
+        col1, col2 = st.columns(2)
         
-        fig_pop, ax_pop = plt.subplots(figsize=(8, 5))
-        sns.barplot(data=pop_df, x='Jumlah Ulasan', y='Pelabuhan', palette='Blues_d', ax=ax_pop) 
-        ax_pop.set_xlabel("Total Ulasan (Volume)", fontsize=10)
-        ax_pop.set_ylabel("", fontsize=10)
-        ax_pop.tick_params(axis='both', which='major', labelsize=9)
-        sns.despine(left=True, bottom=True)
-        st.pyplot(fig_pop)
-
-    with col2:
-        st.markdown("#### Kualitas (Rating) vs Kuantitas (Volume)")
-        st.markdown("<small>Menganalisis keseimbangan antara rating rata-rata dan volume ulasan.</small>", unsafe_allow_html=True)
-        if 'review_rating' in df_working.columns:
-            scatter_df = df_working.groupby('pelabuhan').agg(
-                Rata_Rating=('review_rating', 'mean'),
-                Volume=('review_rating', 'count')
-            ).reset_index()
+        with col1:
+            st.markdown("#### Distribusi Popularitas (Volume Aktivitas)")
+            st.markdown("<small>Pelabuhan dengan volume aktivitas ulasan tertinggi.</small>", unsafe_allow_html=True)
+            pop_df = df_working['pelabuhan'].value_counts().reset_index()
+            pop_df.columns = ['Pelabuhan', 'Jumlah Ulasan']
             
-            fig_scat, ax_scat = plt.subplots(figsize=(8, 5))
-            sns.scatterplot(data=scatter_df, x='Volume', y='Rata_Rating', hue='pelabuhan', s=200, palette='deep', ax=ax_scat)
-            ax_scat.set_xlabel("Volume (Jumlah Ulasan)", fontsize=10)
-            ax_scat.set_ylabel("Kualitas (Rata-rata Rating)", fontsize=10)
-            ax_scat.tick_params(axis='both', which='major', labelsize=9)
-            ax_scat.set_ylim(1, 5) 
-            ax_scat.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8, title='Pelabuhan')
+            fig_pop, ax_pop = plt.subplots(figsize=(8, 5))
+            sns.barplot(data=pop_df, x='Jumlah Ulasan', y='Pelabuhan', palette='Blues_d', ax=ax_pop) 
+            ax_pop.set_xlabel("Total Ulasan (Volume)", fontsize=10)
+            ax_pop.set_ylabel("", fontsize=10)
+            ax_pop.tick_params(axis='both', which='major', labelsize=9)
             sns.despine(left=True, bottom=True)
-            st.pyplot(fig_scat)
-        else:
-            st.warning("Kolom 'review_rating' tidak ditemukan.")
+            st.pyplot(fig_pop)
 
-    st.markdown("---")
-    
-    st.markdown("#### Tren Volume Ulasan per Bulan di Setiap Pelabuhan")
-    if 'bulan_tahun' in df_working.columns:
-        trend_df = df_working.groupby(['bulan_tahun', 'pelabuhan']).size().reset_index(name='Jumlah')
+        with col2:
+            st.markdown("#### Kualitas (Rating) vs Kuantitas (Volume)")
+            st.markdown("<small>Menganalisis keseimbangan antara rating rata-rata dan volume ulasan.</small>", unsafe_allow_html=True)
+            if 'review_rating' in df_working.columns:
+                scatter_df = df_working.groupby('pelabuhan').agg(
+                    Rata_Rating=('review_rating', 'mean'),
+                    Volume=('review_rating', 'count')
+                ).reset_index()
+                
+                fig_scat, ax_scat = plt.subplots(figsize=(8, 5))
+                sns.scatterplot(data=scatter_df, x='Volume', y='Rata_Rating', hue='pelabuhan', s=200, palette='deep', ax=ax_scat)
+                ax_scat.set_xlabel("Volume (Jumlah Ulasan)", fontsize=10)
+                ax_scat.set_ylabel("Kualitas (Rata-rata Rating)", fontsize=10)
+                ax_scat.tick_params(axis='both', which='major', labelsize=9)
+                ax_scat.set_ylim(1, 5) 
+                ax_scat.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8, title='Pelabuhan')
+                sns.despine(left=True, bottom=True)
+                st.pyplot(fig_scat)
+            else:
+                st.warning("Kolom 'review_rating' tidak ditemukan.")
+
+        st.markdown("---")
         
-        fig_trend, ax_trend = plt.subplots(figsize=(12, 5))
-        sns.lineplot(data=trend_df, x='bulan_tahun', y='Jumlah', hue='pelabuhan', marker='o', palette='muted', ax=ax_trend)
-        ax_trend.tick_params(axis='x', rotation=45, labelsize=9) 
-        ax_trend.tick_params(axis='y', labelsize=9)
-        ax_trend.set_xlabel("Periode (Bulan)", fontsize=10)
-        ax_trend.set_ylabel("Volume Ulasan", fontsize=10)
-        ax_trend.grid(True, linestyle='--', alpha=0.6)
-        sns.despine(left=True, bottom=True)
-        st.pyplot(fig_trend)
+        st.markdown("#### Tren Volume Ulasan per Bulan di Setiap Pelabuhan")
+        if 'bulan_tahun' in df_working.columns:
+            trend_df = df_working.groupby(['bulan_tahun', 'pelabuhan']).size().reset_index(name='Jumlah')
+            
+            fig_trend, ax_trend = plt.subplots(figsize=(12, 5))
+            sns.lineplot(data=trend_df, x='bulan_tahun', y='Jumlah', hue='pelabuhan', marker='o', palette='muted', ax=ax_trend)
+            ax_trend.tick_params(axis='x', rotation=45, labelsize=9) 
+            ax_trend.tick_params(axis='y', labelsize=9)
+            ax_trend.set_xlabel("Periode (Bulan)", fontsize=10)
+            ax_trend.set_ylabel("Volume Ulasan", fontsize=10)
+            ax_trend.grid(True, linestyle='--', alpha=0.6)
+            sns.despine(left=True, bottom=True)
+            st.pyplot(fig_trend)
 
 with tab2:
-    col_wc, col_hm = st.columns(2)
-    
-    with col_wc:
-        st.markdown("#### Visualisasi WordCloud")
-        st.write("<small>Kata kunci yang paling sering muncul dalam ulasan.</small>", unsafe_allow_html=True)
+    # PERBAIKAN: Melindungi render WordCloud & Heatmap jika data kosong
+    if df_working.empty:
+         st.info("Pilih minimal satu pelabuhan di sidebar untuk menampilkan analisis kata kunci dan heatmap.")
+    else:
+        col_wc, col_hm = st.columns(2)
         
-        if 'review_text' in df_working.columns:
-            semua_teks = " ".join(df_working['review_text'].dropna().astype(str))
-            if semua_teks.strip(): 
-                wordcloud = WordCloud(width=600, height=400, background_color='white', colormap='Blues').generate(semua_teks)
-                fig_wc, ax_wc = plt.subplots()
-                ax_wc.imshow(wordcloud, interpolation='bilinear')
-                ax_wc.axis('off')
-                st.pyplot(fig_wc)
-            else:
-                st.info("Tidak ada data teks ulasan yang cukup untuk membuat WordCloud.")
-        else:
-            st.warning("Kolom 'review_text' tidak ditemukan.")
-
-    with col_hm:
-        st.markdown("#### Heatmap Keluhan Konsumen (Rating 1 & 2)")
-        st.write("<small>Fokus pada lokasi dan waktu puncak keluhan konsumen.</small>", unsafe_allow_html=True)
-        
-        if 'bulan_tahun' in df_working.columns and 'review_rating' in df_working.columns:
-            df_negatif = df_working[df_working['review_rating'] <= 2]
+        with col_wc:
+            st.markdown("#### Visualisasi WordCloud")
+            st.write("<small>Kata kunci yang paling sering muncul dalam ulasan.</small>", unsafe_allow_html=True)
             
-            if not df_negatif.empty:
-                pivot_keluhan = df_negatif.pivot_table(
-                    index='pelabuhan', 
-                    columns='bulan_tahun', 
-                    values='review_rating', 
-                    aggfunc='count', 
-                    fill_value=0
-                )
-                
-                fig_hm, ax_hm = plt.subplots(figsize=(8, 6))
-                sns.heatmap(pivot_keluhan, cmap='Reds', annot=True, fmt='d', linewidths=.5, ax=ax_hm, annot_kws={"size": 8})
-                ax_hm.set_xlabel("Periode (Bulan)", fontsize=9)
-                ax_hm.set_ylabel("", fontsize=9)
-                ax_hm.tick_params(axis='both', which='major', labelsize=8)
-                sns.despine(left=True, bottom=True)
-                st.pyplot(fig_hm)
+            if 'review_text' in df_working.columns:
+                semua_teks = " ".join(df_working['review_text'].dropna().astype(str))
+                if semua_teks.strip(): 
+                    wordcloud = WordCloud(width=600, height=400, background_color='white', colormap='Blues').generate(semua_teks)
+                    fig_wc, ax_wc = plt.subplots()
+                    ax_wc.imshow(wordcloud, interpolation='bilinear')
+                    ax_wc.axis('off')
+                    st.pyplot(fig_wc)
+                else:
+                    st.info("Tidak ada data teks ulasan yang cukup untuk membuat WordCloud.")
             else:
-                st.success("Luar biasa! Tidak ada ulasan negatif (Rating 1 & 2) yang ditemukan dalam rentang waktu terfilter.")
+                st.warning("Kolom 'review_text' tidak ditemukan.")
+
+        with col_hm:
+            st.markdown("#### Heatmap Keluhan Konsumen (Rating 1 & 2)")
+            st.write("<small>Fokus pada lokasi dan waktu puncak keluhan konsumen.</small>", unsafe_allow_html=True)
+            
+            if 'bulan_tahun' in df_working.columns and 'review_rating' in df_working.columns:
+                df_negatif = df_working[df_working['review_rating'] <= 2]
+                
+                if not df_negatif.empty:
+                    pivot_keluhan = df_negatif.pivot_table(
+                        index='pelabuhan', 
+                        columns='bulan_tahun', 
+                        values='review_rating', 
+                        aggfunc='count', 
+                        fill_value=0
+                    )
+                    
+                    fig_hm, ax_hm = plt.subplots(figsize=(8, 6))
+                    sns.heatmap(pivot_keluhan, cmap='Reds', annot=True, fmt='d', linewidths=.5, ax=ax_hm, annot_kws={"size": 8})
+                    ax_hm.set_xlabel("Periode (Bulan)", fontsize=9)
+                    ax_hm.set_ylabel("", fontsize=9)
+                    ax_hm.tick_params(axis='both', which='major', labelsize=8)
+                    sns.despine(left=True, bottom=True)
+                    st.pyplot(fig_hm)
+                else:
+                    st.success("Luar biasa! Tidak ada ulasan negatif (Rating 1 & 2) yang ditemukan dalam rentang waktu terfilter.")
 
 with tab3:
+    # Tab ini sekarang selalu muncul karena st.stop() telah dihilangkan dari proses filter data!
     st.header("Sistem Uji Sentimen Real-Time")
     
     if model is None or vectorizer is None:
