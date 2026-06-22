@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import matplotlib.subplots as plt_subplots
 import matplotlib.pyplot as plt
 import seaborn as sns
 from wordcloud import WordCloud
@@ -25,7 +26,7 @@ def load_logo():
         image = PILImage.open(logo_path)
         return image
     except FileNotFoundError:
-        logo_url = "https://www.polibatam.ac.id/wp-content/uploads/2024/01/cropped-cropped-cropped-02_Logo_1_Utama_Polibatam_Horizontal@2x.png"
+        logo_url = "https://www.polibatam.ac.id/wp-content/uploads/2024/01/01_Logo_4_W_Polibatam_Vertikal@2x-1-768x714.png"
         return logo_url
     except Exception as e:
         return None
@@ -62,10 +63,9 @@ def load_data():
     df = df.dropna(subset=['tanggal'])
     df['bulan_tahun'] = df['tanggal'].dt.to_period('M').astype(str)
     
-    # ─── PERBAIKAN BARU: Paksa rating menjadi angka ──────────────────
+    # Memastikan rating terbaca sebagai angka
     if 'review_rating' in df.columns:
         df['review_rating'] = pd.to_numeric(df['review_rating'], errors='coerce')
-    # ─────────────────────────────────────────────────────────────────
     
     return df
 
@@ -92,6 +92,7 @@ if df_full is None:
 # 3. SIDEBAR (FILTERS & BRANDING)
 # ==========================================
 with st.sidebar:
+    # Logo Polibatam hanya muncul di Sidebar
     if logo_polibatam:
         if isinstance(logo_polibatam, PILImage.Image):
             logo_resized = logo_polibatam.resize((150, int(150 * logo_polibatam.height / logo_polibatam.width)))
@@ -143,17 +144,11 @@ if df_working.empty:
     st.warning("⚠️ Tidak ada data pelabuhan yang dipilih atau sesuai rentang waktu. Pilih pelabuhan di sidebar untuk melihat visualisasi data.")
 
 # ==========================================
-# 5. BODY - HEADER SECTION (LOGO & TITLE)
+# 5. BODY - HEADER SECTION (TITLE)
 # ==========================================
-header_col1, header_col2 = st.columns([1, 5])
-with header_col1:
-    if logo_polibatam:
-        st.image(logo_polibatam, width=100) 
-    else:
-        st.write("**[POLIBATAM]**")
-with header_col2:
-    st.title("Dashboard Analisis Sentimen Pelabuhan")
-    st.markdown("<p style='font-size: 18px; color: gray; margin-top:-15px;'>powered by Tim Analitik Polibatam</p>", unsafe_allow_html=True)
+# Bagian logo dihapus dari sini, hanya menampilkan Judul
+st.title("Dashboard Analisis Sentimen Pelabuhan")
+st.markdown("<p style='font-size: 18px; color: gray; margin-top:-15px;'>powered by Tim Analitik Polibatam</p>", unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -209,11 +204,9 @@ with tab1:
                     Volume=('review_rating', 'count')
                 ).reset_index()
                 
-                # ─── FITUR DETEKSI BARU: Cek jika ada pelabuhan yang hilang/NaN ───
                 nan_ports = scatter_df[scatter_df['Rata_Rating'].isna() | (scatter_df['Volume'] == 0)]['pelabuhan'].tolist()
                 if nan_ports:
                     st.warning(f"⚠️ Pelabuhan berikut tidak muncul di grafik karena tidak memiliki data rating/ulasan yang valid: {', '.join(nan_ports)}")
-                # ─────────────────────────────────────────────────────────────────
                 
                 fig_scat, ax_scat = plt.subplots(figsize=(8, 5))
                 sns.scatterplot(data=scatter_df, x='Volume', y='Rata_Rating', hue='pelabuhan', s=200, palette='deep', ax=ax_scat)
