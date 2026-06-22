@@ -52,7 +52,6 @@ def load_data():
     })
     
     df = df.dropna(subset=['pelabuhan', 'tanggal'])
-    
     df['tanggal'] = pd.to_datetime(df['tanggal'], errors='coerce')
     
     try:
@@ -62,6 +61,11 @@ def load_data():
     
     df = df.dropna(subset=['tanggal'])
     df['bulan_tahun'] = df['tanggal'].dt.to_period('M').astype(str)
+    
+    # ─── PERBAIKAN BARU: Paksa rating menjadi angka ──────────────────
+    if 'review_rating' in df.columns:
+        df['review_rating'] = pd.to_numeric(df['review_rating'], errors='coerce')
+    # ─────────────────────────────────────────────────────────────────
     
     return df
 
@@ -135,7 +139,6 @@ if len(date_range) == 2:
 else:
     df_working = pd.DataFrame(columns=df_full.columns) 
 
-# PERBAIKAN: st.stop() dihapus dari sini agar UI di bawah tetap dimuat.
 if df_working.empty:
     st.warning("⚠️ Tidak ada data pelabuhan yang dipilih atau sesuai rentang waktu. Pilih pelabuhan di sidebar untuk melihat visualisasi data.")
 
@@ -159,7 +162,6 @@ st.markdown("---")
 # ==========================================
 kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
 
-# PERBAIKAN: Penanganan error jika df_working kosong agar nilai metrik menjadi 0 bukan error
 total_reviews = len(df_working)
 avg_rating = df_working['review_rating'].mean() if ('review_rating' in df_working.columns and not df_working.empty) else 0
 ports_counted = df_working['pelabuhan'].nunique()
@@ -179,7 +181,6 @@ st.markdown("---")
 tab1, tab2, tab3 = st.tabs(["📊 Visualisasi Data & Tren", "☁️ WordCloud & Heatmap Keluhan", "🤖 Prediksi Sentimen AI"])
 
 with tab1:
-    # PERBAIKAN: Melindungi render visualisasi jika data kosong
     if df_working.empty:
         st.info("Pilih minimal satu pelabuhan di sidebar untuk menampilkan visualisasi grafik dan tren.")
     else:
@@ -207,6 +208,12 @@ with tab1:
                     Rata_Rating=('review_rating', 'mean'),
                     Volume=('review_rating', 'count')
                 ).reset_index()
+                
+                # ─── FITUR DETEKSI BARU: Cek jika ada pelabuhan yang hilang/NaN ───
+                nan_ports = scatter_df[scatter_df['Rata_Rating'].isna() | (scatter_df['Volume'] == 0)]['pelabuhan'].tolist()
+                if nan_ports:
+                    st.warning(f"⚠️ Pelabuhan berikut tidak muncul di grafik karena tidak memiliki data rating/ulasan yang valid: {', '.join(nan_ports)}")
+                # ─────────────────────────────────────────────────────────────────
                 
                 fig_scat, ax_scat = plt.subplots(figsize=(8, 5))
                 sns.scatterplot(data=scatter_df, x='Volume', y='Rata_Rating', hue='pelabuhan', s=200, palette='deep', ax=ax_scat)
@@ -237,7 +244,6 @@ with tab1:
             st.pyplot(fig_trend)
 
 with tab2:
-    # PERBAIKAN: Melindungi render WordCloud & Heatmap jika data kosong
     if df_working.empty:
          st.info("Pilih minimal satu pelabuhan di sidebar untuk menampilkan analisis kata kunci dan heatmap.")
     else:
@@ -287,7 +293,6 @@ with tab2:
                     st.success("Luar biasa! Tidak ada ulasan negatif (Rating 1 & 2) yang ditemukan dalam rentang waktu terfilter.")
 
 with tab3:
-    # Tab ini sekarang selalu muncul karena st.stop() telah dihilangkan dari proses filter data!
     st.header("Sistem Uji Sentimen Real-Time")
     
     if model is None or vectorizer is None:
