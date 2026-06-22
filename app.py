@@ -22,7 +22,13 @@ def load_data():
     if not os.path.exists(file_path):
         return None
         
-    df = pd.read_csv(file_path, sep=';') 
+    # PERBAIKAN: Menangani error encoding saat membaca CSV
+    try:
+        # Coba baca dengan utf-8, jika ada karakter aneh, ganti dengan karakter pengganti (?)
+        df = pd.read_csv(file_path, sep=';', encoding='utf-8', encoding_errors='replace')
+    except Exception:
+        # Fallback jika masih gagal: gunakan encoding standar Windows/Latin
+        df = pd.read_csv(file_path, sep=';', encoding='latin1') 
     
     df = df.rename(columns={
         'name': 'pelabuhan',
