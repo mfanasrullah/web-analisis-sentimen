@@ -2,7 +2,6 @@ streamlit
 pandas
 matplotlib
 seaborn
-plotly
 wordcloud
 scikit-learn
 joblib
