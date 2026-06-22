@@ -18,14 +18,25 @@ st.title("🚢 Dashboard Analisis Sentimen & Kinerja Pelabuhan")
 # Gunakan st.cache_data agar data tidak dimuat ulang setiap kali ada interaksi
 @st.cache_data
 def load_data():
-    # GANTI 'data_pelabuhan.csv' DENGAN NAMA FILE DATASET ANDA YANG SEBENARNYA
-    df = pd.read_csv('data_pelabuhan.csv') 
+    # 1. Tambahkan sep=';' karena CSV Anda menggunakan titik koma
+    df = pd.read_csv('data_pelabuhan.csv', sep=';') 
     
-    # Pastikan ada kolom tanggal dan ubah formatnya ke datetime
-    # Sesuaikan 'tanggal' dengan nama kolom tanggal di dataset Anda
-    if 'tanggal' in df.columns:
-        df['tanggal'] = pd.to_datetime(df['tanggal'])
-        df['bulan_tahun'] = df['tanggal'].dt.to_period('M').astype(str)
+    # 2. Ubah nama kolom agar sesuai dengan kode visualisasi di bawahnya
+    df = df.rename(columns={
+        'name': 'pelabuhan',
+        'review_datetime_utc': 'tanggal'
+    })
+    
+    # 3. Bersihkan data kosong (opsional tapi sangat disarankan agar tidak error)
+    df = df.dropna(subset=['pelabuhan', 'tanggal'])
+    
+    # 4. Ubah format teks waktu ke format Datetime Pandas
+    # Menggunakan errors='coerce' agar baris dengan format tanggal rusak tidak membuat error
+    df['tanggal'] = pd.to_datetime(df['tanggal'], errors='coerce')
+    
+    # Buat kolom baru khusus Bulan dan Tahun untuk keperluan tren
+    df['bulan_tahun'] = df['tanggal'].dt.to_period('M').astype(str)
+    
     return df
 
 @st.cache_resource
