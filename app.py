@@ -1,6 +1,3 @@
-periksa dan perbaiki kode berikut
-karena data goldcoast ferry terminal dan nongsapura ferry terminal terlihat dan diambil dari data yang sama padahal seharusnya data yang digunakan berbeda
-
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
