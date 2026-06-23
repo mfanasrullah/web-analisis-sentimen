@@ -328,7 +328,7 @@ with tab3:
                         st.progress(float(prob_negative), text=f"Negatif: {prob_negative:.1%}")
                         
                     # ====================================================
-                    # TAMBAHAN: EKSTRAKSI KATA POSITIF DAN NEGATIF
+                    # EKSTRAKSI KATA POSITIF DAN NEGATIF
                     # ====================================================
                     st.markdown("---")
                     st.markdown("#### 🔍 Analisis Kata Kunci dalam Ulasan")
@@ -337,23 +337,30 @@ with tab3:
                     kata_positif_ditemukan = kata_dalam_teks.intersection(kamus_positif)
                     kata_negatif_ditemukan = kata_dalam_teks.intersection(kamus_negatif)
                     
+                    jml_pos = len(kata_positif_ditemukan)
+                    jml_neg = len(kata_negatif_ditemukan)
+                    
                     col_word1, col_word2 = st.columns(2)
                     
                     with col_word1:
                         if kata_positif_ditemukan:
                             kata_pos_str = ", ".join([f"`{k}`" for k in kata_positif_ditemukan])
-                            st.success(f"**Kata Positif Terdeteksi:**\n\n{kata_pos_str}")
+                            st.success(f"**Kata Positif Terdeteksi ({jml_pos}):**\n\n{kata_pos_str}")
                         else:
-                            st.info("**Kata Positif Terdeteksi:**\n\nTidak ada kata positif dominan.")
+                            st.info("**Kata Positif Terdeteksi:**\n\n0 kata.")
                             
                     with col_word2:
                         if kata_negatif_ditemukan:
                             kata_neg_str = ", ".join([f"`{k}`" for k in kata_negatif_ditemukan])
-                            st.error(f"**Kata Negatif Terdeteksi:**\n\n{kata_neg_str}")
+                            st.error(f"**Kata Negatif Terdeteksi ({jml_neg}):**\n\n{kata_neg_str}")
                         else:
-                            st.info("**Kata Negatif Terdeteksi:**\n\nTidak ada kata negatif dominan.")
+                            st.info("**Kata Negatif Terdeteksi:**\n\n0 kata.")
                             
-                else:
-                    st.warning("Teks tidak valid setelah dibersihkan (mungkin hanya berisi angka/simbol).")
-            else:
-                st.error("Harap masukkan ulasan terlebih dahulu!")
+                    # ====================================================
+                    # LOGIKA DETEKSI ANOMALI (MISMATCH WARNING)
+                    # ====================================================
+                    if prediksi.lower() == "positif" and (jml_neg > jml_pos):
+                        st.warning("💡 **Catatan Analisis:** Model menyimpulkan ulasan ini **Positif**, meskipun terdapat lebih banyak kata bernada negatif. Hal ini biasanya terjadi karena model mendeteksi adanya kata penyangkalan (contoh: *'tidak buruk'*), atau kata positif yang ada memiliki bobot konteks yang jauh lebih kuat.")
+                        
+                    elif prediksi.lower() == "negatif" and (jml_pos > jml_neg):
+                        st.warning("💡 **Catatan Analisis:** Model menyimpulkan ulasan ini **Negatif**, meskipun terdapat lebih banyak kata bernada positif. Harap perhatikan konteks kalimat (misal: sarkasme atau keluhan tersembunyi).")
