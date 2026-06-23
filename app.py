@@ -145,7 +145,6 @@ if df_working.empty:
 # ==========================================
 # 5. BODY - HEADER SECTION (TITLE)
 # ==========================================
-# Bagian logo dihapus dari sini, hanya menampilkan Judul
 st.title("Dashboard Analisis Sentimen Pelabuhan")
 st.markdown("<p style='font-size: 18px; color: gray; margin-top:-15px;'>powered by Tim Analitik Polibatam</p>", unsafe_allow_html=True)
 
@@ -292,6 +291,10 @@ with tab3:
     else:
         st.write("<small>Masukkan teks ulasan baru untuk dianalisis oleh model Machine Learning.</small>", unsafe_allow_html=True)
         
+        # KAMUS KATA POSITIF & NEGATIF (Bisa disesuaikan/ditambah)
+        kamus_positif = {'bagus', 'baik', 'cepat', 'bersih', 'ramah', 'nyaman', 'keren', 'mantap', 'memuaskan', 'mudah', 'rapi', 'aman', 'lancar', 'terbaik', 'puas', 'indah', 'luas', 'modern', 'sip', 'jos'}
+        kamus_negatif = {'buruk', 'lambat', 'kotor', 'mahal', 'antri', 'jelek', 'kecewa', 'sulit', 'lama', 'ribet', 'bising', 'bau', 'rusak', 'berantakan', 'parah', 'kurang', 'sempit', 'macet', 'panas', 'kacau'}
+        
         def clean_text(text):
             text = str(text).lower()
             text = re.sub(r'[^a-z\s]', '', text)
@@ -303,6 +306,7 @@ with tab3:
             if user_input:
                 teks_bersih = clean_text(user_input)
                 if teks_bersih:
+                    # ML Prediction
                     vektor_input = vectorizer.transform([teks_bersih])
                     prediksi = model.predict(vektor_input)[0]
                     probabilitas = model.predict_proba(vektor_input)[0]
@@ -322,6 +326,33 @@ with tab3:
                         
                         st.progress(float(prob_positive), text=f"Positif: {prob_positive:.1%}")
                         st.progress(float(prob_negative), text=f"Negatif: {prob_negative:.1%}")
+                        
+                    # ====================================================
+                    # TAMBAHAN: EKSTRAKSI KATA POSITIF DAN NEGATIF
+                    # ====================================================
+                    st.markdown("---")
+                    st.markdown("#### 🔍 Analisis Kata Kunci dalam Ulasan")
+                    
+                    kata_dalam_teks = set(teks_bersih.split())
+                    kata_positif_ditemukan = kata_dalam_teks.intersection(kamus_positif)
+                    kata_negatif_ditemukan = kata_dalam_teks.intersection(kamus_negatif)
+                    
+                    col_word1, col_word2 = st.columns(2)
+                    
+                    with col_word1:
+                        if kata_positif_ditemukan:
+                            kata_pos_str = ", ".join([f"`{k}`" for k in kata_positif_ditemukan])
+                            st.success(f"**Kata Positif Terdeteksi:**\n\n{kata_pos_str}")
+                        else:
+                            st.info("**Kata Positif Terdeteksi:**\n\nTidak ada kata positif dominan.")
+                            
+                    with col_word2:
+                        if kata_negatif_ditemukan:
+                            kata_neg_str = ", ".join([f"`{k}`" for k in kata_negatif_ditemukan])
+                            st.error(f"**Kata Negatif Terdeteksi:**\n\n{kata_neg_str}")
+                        else:
+                            st.info("**Kata Negatif Terdeteksi:**\n\nTidak ada kata negatif dominan.")
+                            
                 else:
                     st.warning("Teks tidak valid setelah dibersihkan (mungkin hanya berisi angka/simbol).")
             else:
