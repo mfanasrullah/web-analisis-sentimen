@@ -17,8 +17,11 @@ st.title("🚢 Dashboard Analisis Sentimen & Kinerja Pelabuhan")
 # ==========================================
 @st.cache_data
 def load_data():
-    # 1. Tambahkan sep=';' karena CSV menggunakan titik koma
-    df = pd.read_csv('data_pelabuhan.csv', sep=';') 
+    # 1. Tambahkan penanganan ENCODING untuk mengatasi error "<frozen codecs>"
+    try:
+        df = pd.read_csv('data_pelabuhan.csv', sep=';', encoding='utf-8') 
+    except UnicodeDecodeError:
+        df = pd.read_csv('data_pelabuhan.csv', sep=';', encoding='latin1')
     
     # 2. Ubah nama kolom agar sesuai dengan kode visualisasi
     df = df.rename(columns={
@@ -39,9 +42,12 @@ def load_data():
 
 @st.cache_resource
 def load_model():
-    model = joblib.load('model_sentimen.pkl')
-    vectorizer = joblib.load('vectorizer_sentimen.pkl')
-    return model, vectorizer
+    try:
+        model = joblib.load('model_sentimen.pkl')
+        vectorizer = joblib.load('vectorizer_sentimen.pkl')
+        return model, vectorizer
+    except Exception as e:
+        return None, None
 
 df = load_data()
 model, vectorizer = load_model()
@@ -72,17 +78,20 @@ with tab1:
 
     with col2:
         st.subheader("Kualitas (Rating) vs Kuantitas (Volume)")
-        scatter_df = df.groupby('pelabuhan').agg(
-            Rata_Rating=('review_rating', 'mean'),
-            Volume=('review_rating', 'count')
-        ).reset_index()
-        
-        fig_scat, ax_scat = plt.subplots(figsize=(8, 5))
-        sns.scatterplot(data=scatter_df, x='Volume', y='Rata_Rating', hue='pelabuhan', s=150, ax=ax_scat)
-        ax_scat.set_xlabel("Kuantitas (Jumlah Ulasan)")
-        ax_scat.set_ylabel("Kualitas (Rata-rata Rating)")
-        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-        st.pyplot(fig_scat)
+        if 'review_rating' in df.columns:
+            scatter_df = df.groupby('pelabuhan').agg(
+                Rata_Rating=('review_rating', 'mean'),
+                Volume=('review_rating', 'count')
+            ).reset_index()
+            
+            fig_scat, ax_scat = plt.subplots(figsize=(8, 5))
+            sns.scatterplot(data=scatter_df, x='Volume', y='Rata_Rating', hue='pelabuhan', s=150, ax=ax_scat)
+            ax_scat.set_xlabel("Kuantitas (Jumlah Ulasan)")
+            ax_scat.set_ylabel("Kualitas (Rata-rata Rating)")
+            plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+            st.pyplot(fig_scat)
+        else:
+            st.warning("Kolom 'review_rating' tidak ditemukan.")
 
     st.markdown("---")
     
@@ -110,7 +119,6 @@ with tab2:
         st.subheader("Visualisasi WordCloud")
         st.write("Kata yang paling sering muncul dalam ulasan.")
         
-        # Penanganan jika kolom review_text kosong agar WordCloud tidak error
         if 'review_text' in df.columns and not df['review_text'].dropna().empty:
             semua_teks = " ".join(df['review_text'].dropna().astype(str))
             wordcloud = WordCloud(width=600, height=400, background_color='white', colormap='Blues').generate(semua_teks)
@@ -126,7 +134,7 @@ with tab2:
         st.subheader("Heatmap Keluhan (Rating 1 & 2)")
         st.write("Intensitas ulasan negatif per pelabuhan dan bulan.")
         
-        if 'bulan_tahun' in df.columns:
+        if 'bulan_tahun' in df.columns and 'review_rating' in df.columns:
             df_negatif = df[df['review_rating'] <= 2]
             
             if not df_negatif.empty:
@@ -163,7 +171,9 @@ with tab3:
     user_input = st.text_area("Ketik ulasan terkait layanan imigrasi atau pelabuhan:", height=120)
     
     if st.button("Analisis Ulasan", type="primary"):
-        if user_input:
+        if model is None or vectorizer is None:
+            st.error("Model Machine Learning belum tersedia (file .pkl tidak ditemukan atau gagal dimuat).")
+        elif user_input:
             teks_bersih = clean_text(user_input)
             if teks_bersih:
                 vektor_input = vectorizer.transform([teks_bersih])
