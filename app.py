@@ -112,7 +112,7 @@ with st.sidebar:
         default=all_ports 
     )
     
-    st.markdown("#### 📅 Pilih Rentang Tanggal")
+    st.markdown("#### Pilih Rentang Tanggal")
     min_date = df_full['tanggal'].min().date()
     max_date = df_full['tanggal'].max().date()
     
