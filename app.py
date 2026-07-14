@@ -116,12 +116,17 @@ with st.sidebar:
     min_date = df_full['tanggal'].min().date()
     max_date = df_full['tanggal'].max().date()
     
-    date_range = st.date_input(
-        "Pilih Rentang Tanggal:",
-        value=(min_date, max_date),
-        min_value=min_date,
-        max_value=max_date
-    )
+    # PERBAIKAN: Membagi input tanggal menjadi 2 kolom terpisah agar lebih intuitif
+    col_date1, col_date2 = st.columns(2)
+    with col_date1:
+        start_date = st.date_input("📅 Tanggal Mulai", value=min_date, min_value=min_date, max_value=max_date)
+    with col_date2:
+        end_date = st.date_input("📅 Tanggal Akhir", value=max_date, min_value=min_date, max_value=max_date)
+        
+    # Validasi jika pengguna salah memasukkan urutan tanggal
+    if start_date > end_date:
+        st.error("⚠️ Tgl Mulai tidak boleh melewati Tgl Akhir!")
+
     st.markdown("---")
     st.markdown("<small>Dikembangkan oleh Tim Analitik Polibatam</small>", unsafe_allow_html=True)
 
@@ -130,13 +135,14 @@ with st.sidebar:
 # ==========================================
 df_working = df_full[df_full['pelabuhan'].isin(selected_ports)]
 
-if len(date_range) == 2:
-    start_date, end_date = date_range
+# PERBAIKAN: Logika filter menggunakan variabel start_date dan end_date yang baru
+if start_date <= end_date:
     df_working = df_working[
         (df_working['tanggal'].dt.date >= start_date) & 
         (df_working['tanggal'].dt.date <= end_date)
     ]
 else:
+    # Kosongkan dataframe jika tanggal tidak valid
     df_working = pd.DataFrame(columns=df_full.columns) 
 
 if df_working.empty:
@@ -209,158 +215,4 @@ with tab1:
                 fig_scat, ax_scat = plt.subplots(figsize=(8, 5))
                 sns.scatterplot(data=scatter_df, x='Volume', y='Rata_Rating', hue='pelabuhan', s=200, palette='deep', ax=ax_scat)
                 ax_scat.set_xlabel("Volume (Jumlah Ulasan)", fontsize=10)
-                ax_scat.set_ylabel("Kualitas (Rata-rata Rating)", fontsize=10)
-                ax_scat.tick_params(axis='both', which='major', labelsize=9)
-                ax_scat.set_ylim(1, 5) 
-                ax_scat.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8, title='Pelabuhan')
-                sns.despine(left=True, bottom=True)
-                st.pyplot(fig_scat)
-            else:
-                st.warning("Kolom 'review_rating' tidak ditemukan.")
-
-        st.markdown("---")
-        
-        st.markdown("#### Tren Volume Ulasan per Bulan di Setiap Pelabuhan")
-        if 'bulan_tahun' in df_working.columns:
-            trend_df = df_working.groupby(['bulan_tahun', 'pelabuhan']).size().reset_index(name='Jumlah')
-            
-            fig_trend, ax_trend = plt.subplots(figsize=(12, 5))
-            sns.lineplot(data=trend_df, x='bulan_tahun', y='Jumlah', hue='pelabuhan', marker='o', palette='muted', ax=ax_trend)
-            ax_trend.tick_params(axis='x', rotation=45, labelsize=9) 
-            ax_trend.tick_params(axis='y', labelsize=9)
-            ax_trend.set_xlabel("Periode (Bulan)", fontsize=10)
-            ax_trend.set_ylabel("Volume Ulasan", fontsize=10)
-            ax_trend.grid(True, linestyle='--', alpha=0.6)
-            sns.despine(left=True, bottom=True)
-            st.pyplot(fig_trend)
-
-with tab2:
-    if df_working.empty:
-         st.info("Pilih minimal satu pelabuhan di sidebar untuk menampilkan analisis kata kunci dan heatmap.")
-    else:
-        col_wc, col_hm = st.columns(2)
-        
-        with col_wc:
-            st.markdown("#### Visualisasi WordCloud")
-            st.write("<small>Kata kunci yang paling sering muncul dalam ulasan.</small>", unsafe_allow_html=True)
-            
-            if 'review_text' in df_working.columns:
-                semua_teks = " ".join(df_working['review_text'].dropna().astype(str))
-                if semua_teks.strip(): 
-                    wordcloud = WordCloud(width=600, height=400, background_color='white', colormap='Blues').generate(semua_teks)
-                    fig_wc, ax_wc = plt.subplots()
-                    ax_wc.imshow(wordcloud, interpolation='bilinear')
-                    ax_wc.axis('off')
-                    st.pyplot(fig_wc)
-                else:
-                    st.info("Tidak ada data teks ulasan yang cukup untuk membuat WordCloud.")
-            else:
-                st.warning("Kolom 'review_text' tidak ditemukan.")
-
-        with col_hm:
-            st.markdown("#### Heatmap Keluhan Konsumen (Rating 1 & 2)")
-            st.write("<small>Fokus pada lokasi dan waktu puncak keluhan konsumen.</small>", unsafe_allow_html=True)
-            
-            if 'bulan_tahun' in df_working.columns and 'review_rating' in df_working.columns:
-                df_negatif = df_working[df_working['review_rating'] <= 2]
-                
-                if not df_negatif.empty:
-                    pivot_keluhan = df_negatif.pivot_table(
-                        index='pelabuhan', 
-                        columns='bulan_tahun', 
-                        values='review_rating', 
-                        aggfunc='count', 
-                        fill_value=0
-                    )
-                    
-                    fig_hm, ax_hm = plt.subplots(figsize=(8, 6))
-                    sns.heatmap(pivot_keluhan, cmap='Reds', annot=True, fmt='d', linewidths=.5, ax=ax_hm, annot_kws={"size": 8})
-                    ax_hm.set_xlabel("Periode (Bulan)", fontsize=9)
-                    ax_hm.set_ylabel("", fontsize=9)
-                    ax_hm.tick_params(axis='both', which='major', labelsize=8)
-                    sns.despine(left=True, bottom=True)
-                    st.pyplot(fig_hm)
-                else:
-                    st.success("Luar biasa! Tidak ada ulasan negatif (Rating 1 & 2) yang ditemukan dalam rentang waktu terfilter.")
-
-with tab3:
-    st.header("Sistem Uji Sentimen Real-Time")
-    
-    if model is None or vectorizer is None:
-        st.error("Model Machine Learning belum tersedia (file .pkl tidak ditemukan). Fitur prediksi dinonaktifkan.")
-    else:
-        st.write("<small>Masukkan teks ulasan baru untuk dianalisis oleh model Machine Learning.</small>", unsafe_allow_html=True)
-        
-        # KAMUS KATA POSITIF & NEGATIF (Bisa disesuaikan/ditambah)
-        kamus_positif = {'bagus', 'baik', 'cepat', 'bersih', 'ramah', 'nyaman', 'keren', 'mantap', 'memuaskan', 'mudah', 'rapi', 'aman', 'lancar', 'terbaik', 'puas', 'indah', 'luas', 'modern', 'sip', 'jos'}
-        kamus_negatif = {'buruk', 'lambat', 'kotor', 'mahal', 'antri', 'jelek', 'kecewa', 'sulit', 'lama', 'ribet', 'bising', 'bau', 'rusak', 'berantakan', 'parah', 'kurang', 'sempit', 'macet', 'panas', 'kacau'}
-        
-        def clean_text(text):
-            text = str(text).lower()
-            text = re.sub(r'[^a-z\s]', '', text)
-            return text.strip()
-        
-        user_input = st.text_area("Ketik ulasan terkait layanan pelabuhan (maks. 500 kata):", height=120)
-        
-        if st.button("Analisis Ulasan", type="primary"):
-            if user_input:
-                teks_bersih = clean_text(user_input)
-                if teks_bersih:
-                    # ML Prediction
-                    vektor_input = vectorizer.transform([teks_bersih])
-                    prediksi = model.predict(vektor_input)[0]
-                    probabilitas = model.predict_proba(vektor_input)[0]
-                    
-                    result_col1, result_col2 = st.columns(2)
-                    
-                    warna = "green" if prediksi.lower() == "positif" else "red" if prediksi.lower() == "negatif" else "gray"
-                    
-                    with result_col1:
-                        st.markdown(f"<div style='border: 1px solid lightgray; padding: 10px; border-radius: 5px;'>Hasil Deteksi Model: <b style='color:{warna}; font-size: 20px;'>{prediksi.upper()}</b></div>", unsafe_allow_html=True)
-                    
-                    with result_col2:
-                        st.write("**Keyakinan Model (Probabilitas):**")
-                        classes_lower = [str(c).lower() for c in model.classes_]
-                        prob_positive = probabilitas[classes_lower.index('positif')] if 'positif' in classes_lower else 0
-                        prob_negative = probabilitas[classes_lower.index('negatif')] if 'negatif' in classes_lower else 0
-                        
-                        st.progress(float(prob_positive), text=f"Positif: {prob_positive:.1%}")
-                        st.progress(float(prob_negative), text=f"Negatif: {prob_negative:.1%}")
-                        
-                    # ====================================================
-                    # EKSTRAKSI KATA POSITIF DAN NEGATIF
-                    # ====================================================
-                    st.markdown("---")
-                    st.markdown("#### 🔍 Analisis Kata Kunci dalam Ulasan")
-                    
-                    kata_dalam_teks = set(teks_bersih.split())
-                    kata_positif_ditemukan = kata_dalam_teks.intersection(kamus_positif)
-                    kata_negatif_ditemukan = kata_dalam_teks.intersection(kamus_negatif)
-                    
-                    jml_pos = len(kata_positif_ditemukan)
-                    jml_neg = len(kata_negatif_ditemukan)
-                    
-                    col_word1, col_word2 = st.columns(2)
-                    
-                    with col_word1:
-                        if kata_positif_ditemukan:
-                            kata_pos_str = ", ".join([f"`{k}`" for k in kata_positif_ditemukan])
-                            st.success(f"**Kata Positif Terdeteksi ({jml_pos}):**\n\n{kata_pos_str}")
-                        else:
-                            st.info("**Kata Positif Terdeteksi:**\n\n0 kata.")
-                            
-                    with col_word2:
-                        if kata_negatif_ditemukan:
-                            kata_neg_str = ", ".join([f"`{k}`" for k in kata_negatif_ditemukan])
-                            st.error(f"**Kata Negatif Terdeteksi ({jml_neg}):**\n\n{kata_neg_str}")
-                        else:
-                            st.info("**Kata Negatif Terdeteksi:**\n\n0 kata.")
-                            
-                    # ====================================================
-                    # LOGIKA DETEKSI ANOMALI (MISMATCH WARNING)
-                    # ====================================================
-                    if prediksi.lower() == "positif" and (jml_neg > jml_pos):
-                        st.warning("💡 **Catatan Analisis:** Model menyimpulkan ulasan ini **Positif**, meskipun terdapat lebih banyak kata bernada negatif. Hal ini biasanya terjadi karena model mendeteksi adanya kata penyangkalan (contoh: *'tidak buruk'*), atau kata positif yang ada memiliki bobot konteks yang jauh lebih kuat.")
-                        
-                    elif prediksi.lower() == "negatif" and (jml_pos > jml_neg):
-                        st.warning("💡 **Catatan Analisis:** Model menyimpulkan ulasan ini **Negatif**, meskipun terdapat lebih banyak kata bernada positif. Harap perhatikan konteks kalimat (misal: sarkasme atau keluhan tersembunyi).")
+                ax_scat
