@@ -264,7 +264,7 @@ with tab2:
                 st.warning("Kolom 'review_text' tidak ditemukan.")
 
         with col_hm:
-            st.markdown("#### Heatmap Keluhan Konsumen (Rating 1 & 2)")
+            st.markdown("#### Heatmap Keluhan Konsumen")
             st.write("<small>Fokus pada lokasi dan waktu puncak keluhan konsumen.</small>", unsafe_allow_html=True)
             
             if 'bulan_tahun' in df_working.columns and 'review_rating' in df_working.columns:
