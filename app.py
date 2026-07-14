@@ -116,7 +116,7 @@ with st.sidebar:
     min_date = df_full['tanggal'].min().date()
     max_date = df_full['tanggal'].max().date()
     
-    # Membagi input tanggal menjadi 2 kolom terpisah agar lebih intuitif
+    # PERBAIKAN: Membagi input tanggal menjadi 2 kolom terpisah agar lebih intuitif
     col_date1, col_date2 = st.columns(2)
     with col_date1:
         start_date = st.date_input("📅 Tanggal Mulai", value=min_date, min_value=min_date, max_value=max_date)
@@ -135,7 +135,7 @@ with st.sidebar:
 # ==========================================
 df_working = df_full[df_full['pelabuhan'].isin(selected_ports)]
 
-# Logika filter menggunakan variabel start_date dan end_date
+# PERBAIKAN: Logika filter menggunakan variabel start_date dan end_date yang baru
 if start_date <= end_date:
     df_working = df_working[
         (df_working['tanggal'].dt.date >= start_date) & 
@@ -175,81 +175,81 @@ with kpi_col3:
 st.markdown("---")
 
 # ==========================================
-# 7. BODY - PEMBUATAN TABS (VERSI DIPERBARUI)
+# 7. BODY - PEMBUATAN TABS
 # ==========================================
-tab1, tab2, tab3, tab4 = st.tabs([
-    "📊 Ringkasan & Tren Kinerja", 
-    "☁️ Analisis Kata & Heatmap", 
-    "📝 Suara Konsumen (Daftar Ulasan)", 
-    "🤖 Uji AI Real-Time"
-])
+tab1, tab2, tab3 = st.tabs(["📊 Visualisasi Data & Tren", "☁️ WordCloud & Heatmap Keluhan", "🤖 Prediksi Sentimen AI"])
 
-# ==== TAB 1: RINGKASAN & TREN KINERJA ====
 with tab1:
     if df_working.empty:
-        st.info("Pilih minimal satu pelabuhan di sidebar.")
+        st.info("Pilih minimal satu pelabuhan di sidebar untuk menampilkan visualisasi grafik dan tren.")
     else:
-        st.markdown("#### Papan Peringkat Pelabuhan (Leaderboard)")
-        st.markdown("<small>Matriks perbandingan performa antar pelabuhan.</small>", unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
         
-        # Membuat tabel summary (Leaderboard)
-        if 'label' in df_working.columns and 'review_rating' in df_working.columns:
-            leaderboard = df_working.groupby('pelabuhan').agg(
-                Total_Ulasan=('review_text', 'count'),
-                Rata_Rating=('review_rating', 'mean')
-            ).reset_index()
+        with col1:
+            st.markdown("#### Distribusi Popularitas (Volume Aktivitas)")
+            st.markdown("<small>Pelabuhan dengan volume aktivitas ulasan tertinggi.</small>", unsafe_allow_html=True)
+            pop_df = df_working['pelabuhan'].value_counts().reset_index()
+            pop_df.columns = ['Pelabuhan', 'Jumlah Ulasan']
             
-            # Hitung persentase sentimen positif
-            positif_count = df_working[df_working['label'].str.lower() == 'positif'].groupby('pelabuhan').size()
-            leaderboard = leaderboard.set_index('pelabuhan')
-            leaderboard['% Sentimen Positif'] = (positif_count / leaderboard['Total_Ulasan'] * 100).fillna(0).round(1).astype(str) + '%'
-            leaderboard['Rata_Rating'] = leaderboard['Rata_Rating'].round(2)
-            
-            st.dataframe(leaderboard.reset_index(), use_container_width=True)
+            fig_pop, ax_pop = plt.subplots(figsize=(8, 5))
+            sns.barplot(data=pop_df, x='Jumlah Ulasan', y='Pelabuhan', palette='Blues_d', ax=ax_pop) 
+            ax_pop.set_xlabel("Total Ulasan (Volume)", fontsize=10)
+            ax_pop.set_ylabel("", fontsize=10)
+            ax_pop.tick_params(axis='both', which='major', labelsize=9)
+            sns.despine(left=True, bottom=True)
+            st.pyplot(fig_pop)
+
+        with col2:
+            st.markdown("#### Kualitas (Rating) vs Kuantitas (Volume)")
+            st.markdown("<small>Menganalisis keseimbangan antara rating rata-rata dan volume ulasan.</small>", unsafe_allow_html=True)
+            if 'review_rating' in df_working.columns:
+                scatter_df = df_working.groupby('pelabuhan').agg(
+                    Rata_Rating=('review_rating', 'mean'),
+                    Volume=('review_rating', 'count')
+                ).reset_index()
+                
+                nan_ports = scatter_df[scatter_df['Rata_Rating'].isna() | (scatter_df['Volume'] == 0)]['pelabuhan'].tolist()
+                if nan_ports:
+                    st.warning(f"⚠️ Pelabuhan berikut tidak muncul di grafik karena tidak memiliki data rating/ulasan yang valid: {', '.join(nan_ports)}")
+                
+                fig_scat, ax_scat = plt.subplots(figsize=(8, 5))
+                sns.scatterplot(data=scatter_df, x='Volume', y='Rata_Rating', hue='pelabuhan', s=200, palette='deep', ax=ax_scat)
+                ax_scat.set_xlabel("Volume (Jumlah Ulasan)", fontsize=10)
+                ax_scat.set_ylabel("Kualitas (Rata-rata Rating)", fontsize=10)
+                ax_scat.tick_params(axis='both', which='major', labelsize=9)
+                ax_scat.set_ylim(1, 5) 
+                ax_scat.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8, title='Pelabuhan')
+                sns.despine(left=True, bottom=True)
+                st.pyplot(fig_scat)
+            else:
+                st.warning("Kolom 'review_rating' tidak ditemukan.")
 
         st.markdown("---")
         
-        col1_t1, col2_t1 = st.columns(2)
-        
-        with col1_t1:
-            st.markdown("#### Proporsi Sentimen Pengunjung")
-            st.markdown("<small>Persentase ulasan Positif, Netral, dan Negatif.</small>", unsafe_allow_html=True)
-            if 'label' in df_working.columns:
-                sentimen_counts = df_working['label'].value_counts()
-                fig_pie, ax_pie = plt.subplots(figsize=(6, 5))
-                # Menggunakan warna khusus: Positif(Hijau), Negatif(Merah), Netral(Abu-abu)
-                colors = ['#2ca02c' if label.lower()=='positif' else '#d62728' if label.lower()=='negatif' else '#7f7f7f' for label in sentimen_counts.index]
-                
-                ax_pie.pie(sentimen_counts, labels=sentimen_counts.index, autopct='%1.1f%%', startangle=90, colors=colors, textprops={'fontsize': 10})
-                ax_pie.axis('equal')
-                st.pyplot(fig_pie)
-            else:
-                st.warning("Kolom 'label' sentimen tidak ditemukan dalam data.")
+        st.markdown("#### Tren Volume Ulasan per Bulan di Setiap Pelabuhan")
+        if 'bulan_tahun' in df_working.columns:
+            trend_df = df_working.groupby(['bulan_tahun', 'pelabuhan']).size().reset_index(name='Jumlah')
+            
+            fig_trend, ax_trend = plt.subplots(figsize=(12, 5))
+            sns.lineplot(data=trend_df, x='bulan_tahun', y='Jumlah', hue='pelabuhan', marker='o', palette='muted', ax=ax_trend)
+            ax_trend.tick_params(axis='x', rotation=45, labelsize=9) 
+            ax_trend.tick_params(axis='y', labelsize=9)
+            ax_trend.set_xlabel("Periode (Bulan)", fontsize=10)
+            ax_trend.set_ylabel("Volume Ulasan", fontsize=10)
+            ax_trend.grid(True, linestyle='--', alpha=0.6)
+            sns.despine(left=True, bottom=True)
+            st.pyplot(fig_trend)
 
-        with col2_t1:
-            st.markdown("#### Tren Kepuasan (Rata-rata Rating) per Bulan")
-            st.markdown("<small>Melihat fluktuasi kepuasan pelanggan dari waktu ke waktu.</small>", unsafe_allow_html=True)
-            if 'bulan_tahun' in df_working.columns and 'review_rating' in df_working.columns:
-                trend_rating_df = df_working.groupby(['bulan_tahun', 'pelabuhan'])['review_rating'].mean().reset_index()
-                
-                fig_trend_rating, ax_trend_rating = plt.subplots(figsize=(8, 5))
-                sns.lineplot(data=trend_rating_df, x='bulan_tahun', y='review_rating', hue='pelabuhan', marker='s', ax=ax_trend_rating)
-                ax_trend_rating.tick_params(axis='x', rotation=45)
-                ax_trend_rating.set_xlabel("Bulan", fontsize=10)
-                ax_trend_rating.set_ylabel("Rata-rata Rating", fontsize=10)
-                ax_trend_rating.set_ylim(1, 5) # Rating selalu 1-5
-                sns.despine(left=True, bottom=True)
-                st.pyplot(fig_trend_rating)
-
-# ==== TAB 2: WORDCLOUD & HEATMAP ====
 with tab2:
     if df_working.empty:
-         st.info("Pilih minimal satu pelabuhan di sidebar.")
+         st.info("Pilih minimal satu pelabuhan di sidebar untuk menampilkan analisis kata kunci dan heatmap.")
     else:
         col_wc, col_hm = st.columns(2)
+        
         with col_wc:
             st.markdown("#### Visualisasi WordCloud")
-            st.markdown("<small>Kata kunci yang paling sering muncul dalam ulasan.</small>", unsafe_allow_html=True)
+            st.write("<small>Kata kunci yang paling sering muncul dalam ulasan.</small>", unsafe_allow_html=True)
+            
             if 'review_text' in df_working.columns:
                 semua_teks = " ".join(df_working['review_text'].dropna().astype(str))
                 if semua_teks.strip(): 
@@ -259,53 +259,37 @@ with tab2:
                     ax_wc.axis('off')
                     st.pyplot(fig_wc)
                 else:
-                    st.info("Data ulasan tidak cukup.")
-                    
+                    st.info("Tidak ada data teks ulasan yang cukup untuk membuat WordCloud.")
+            else:
+                st.warning("Kolom 'review_text' tidak ditemukan.")
+
         with col_hm:
             st.markdown("#### Heatmap Keluhan Konsumen (Rating 1 & 2)")
-            st.markdown("<small>Fokus pada lokasi dan waktu puncak keluhan konsumen.</small>", unsafe_allow_html=True)
+            st.write("<small>Fokus pada lokasi dan waktu puncak keluhan konsumen.</small>", unsafe_allow_html=True)
+            
             if 'bulan_tahun' in df_working.columns and 'review_rating' in df_working.columns:
                 df_negatif = df_working[df_working['review_rating'] <= 2]
+                
                 if not df_negatif.empty:
-                    pivot_keluhan = df_negatif.pivot_table(index='pelabuhan', columns='bulan_tahun', values='review_rating', aggfunc='count', fill_value=0)
+                    pivot_keluhan = df_negatif.pivot_table(
+                        index='pelabuhan', 
+                        columns='bulan_tahun', 
+                        values='review_rating', 
+                        aggfunc='count', 
+                        fill_value=0
+                    )
+                    
                     fig_hm, ax_hm = plt.subplots(figsize=(8, 6))
                     sns.heatmap(pivot_keluhan, cmap='Reds', annot=True, fmt='d', linewidths=.5, ax=ax_hm, annot_kws={"size": 8})
                     ax_hm.set_xlabel("Periode (Bulan)", fontsize=9)
                     ax_hm.set_ylabel("", fontsize=9)
+                    ax_hm.tick_params(axis='both', which='major', labelsize=8)
                     sns.despine(left=True, bottom=True)
                     st.pyplot(fig_hm)
                 else:
-                    st.success("Tidak ada ulasan negatif di rentang ini.")
+                    st.success("Luar biasa! Tidak ada ulasan negatif (Rating 1 & 2) yang ditemukan dalam rentang waktu terfilter.")
 
-# ==== TAB 3: DAFTAR ULASAN ASLI ====
 with tab3:
-    st.markdown("### 📝 Daftar Ulasan (Voice of Customer)")
-    st.markdown("Telusuri ulasan asli dari pelanggan. Gunakan filter di bawah ini untuk mencari keluhan atau pujian spesifik.")
-    
-    if not df_working.empty and 'review_text' in df_working.columns:
-        col_filter1, col_filter2 = st.columns(2)
-        with col_filter1:
-            filter_sentimen = st.selectbox("Filter Sentimen:", ["Semua", "Negatif", "Positif", "Netral"])
-        with col_filter2:
-            cari_kata = st.text_input("Cari kata kunci (Contoh: kotor, lama, calo):", "")
-        
-        # Aplikasikan filter
-        df_tampil = df_working[['tanggal', 'pelabuhan', 'review_rating', 'label', 'review_text']].copy()
-        
-        if filter_sentimen != "Semua":
-            df_tampil = df_tampil[df_tampil['label'].str.lower() == filter_sentimen.lower()]
-            
-        if cari_kata:
-            df_tampil = df_tampil[df_tampil['review_text'].str.contains(cari_kata, case=False, na=False)]
-            
-        # Format tabel agar rapi
-        df_tampil['tanggal'] = df_tampil['tanggal'].dt.strftime('%Y-%m-%d %H:%M')
-        st.dataframe(df_tampil.sort_values('tanggal', ascending=False), use_container_width=True, height=400)
-    else:
-        st.warning("Data ulasan teks tidak tersedia.")
-
-# ==== TAB 4: PREDIKSI AI (SISTEM UJI REAL-TIME) ====
-with tab4:
     st.header("Sistem Uji Sentimen Real-Time")
     
     if model is None or vectorizer is None:
@@ -313,7 +297,7 @@ with tab4:
     else:
         st.write("<small>Masukkan teks ulasan baru untuk dianalisis oleh model Machine Learning.</small>", unsafe_allow_html=True)
         
-        # KAMUS KATA POSITIF & NEGATIF 
+        # KAMUS KATA POSITIF & NEGATIF (Bisa disesuaikan/ditambah)
         kamus_positif = {'bagus', 'baik', 'cepat', 'bersih', 'ramah', 'nyaman', 'keren', 'mantap', 'memuaskan', 'mudah', 'rapi', 'aman', 'lancar', 'terbaik', 'puas', 'indah', 'luas', 'modern', 'sip', 'jos'}
         kamus_negatif = {'buruk', 'lambat', 'kotor', 'mahal', 'antri', 'jelek', 'kecewa', 'sulit', 'lama', 'ribet', 'bising', 'bau', 'rusak', 'berantakan', 'parah', 'kurang', 'sempit', 'macet', 'panas', 'kacau'}
         
@@ -349,7 +333,9 @@ with tab4:
                         st.progress(float(prob_positive), text=f"Positif: {prob_positive:.1%}")
                         st.progress(float(prob_negative), text=f"Negatif: {prob_negative:.1%}")
                         
+                    # ====================================================
                     # EKSTRAKSI KATA POSITIF DAN NEGATIF
+                    # ====================================================
                     st.markdown("---")
                     st.markdown("#### 🔍 Analisis Kata Kunci dalam Ulasan")
                     
@@ -376,7 +362,9 @@ with tab4:
                         else:
                             st.info("**Kata Negatif Terdeteksi:**\n\n0 kata.")
                             
+                    # ====================================================
                     # LOGIKA DETEKSI ANOMALI (MISMATCH WARNING)
+                    # ====================================================
                     if prediksi.lower() == "positif" and (jml_neg > jml_pos):
                         st.warning("💡 **Catatan Analisis:** Model menyimpulkan ulasan ini **Positif**, meskipun terdapat lebih banyak kata bernada negatif. Hal ini biasanya terjadi karena model mendeteksi adanya kata penyangkalan (contoh: *'tidak buruk'*), atau kata positif yang ada memiliki bobot konteks yang jauh lebih kuat.")
                         
