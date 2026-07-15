@@ -7,7 +7,6 @@ import joblib
 import re
 import os
 import PIL.Image as PILImage
-from collections import Counter
 
 # ==========================================
 # 0. KONFIGURASI TEMA & PALETTE WARNA CORPORATE
@@ -38,7 +37,7 @@ logo_polibatam = load_logo()
 # ==========================================
 @st.cache_data
 def load_data():
-    file_path = 'data_pelabuhan_cleaned.csv' # Instruksi 1: Menggunakan file ini
+    file_path = 'data_pelabuhan_cleaned.csv'
     if not os.path.exists(file_path):
         return None
         
@@ -47,10 +46,9 @@ def load_data():
     except Exception:
         df = pd.read_csv(file_path, sep=';', encoding='latin1') 
     
-    # Menstandarkan nama kolom sesuai instruksi
     df = df.rename(columns={
         'name': 'pelabuhan',
-        'review_datetime_utc': 'tanggal' # Instruksi 4: Digunakan untuk informasi kapan ulasan diberikan
+        'review_datetime_utc': 'tanggal'
     })
     
     df = df.dropna(subset=['pelabuhan', 'tanggal'])
@@ -64,11 +62,9 @@ def load_data():
     df = df.dropna(subset=['tanggal'])
     df['bulan_tahun'] = df['tanggal'].dt.to_period('M').astype(str)
     
-    # Instruksi 3: Memastikan rating (review_rating) terbaca sebagai angka
     if 'review_rating' in df.columns:
         df['review_rating'] = pd.to_numeric(df['review_rating'], errors='coerce')
         
-    # Pastikan label berformat string
     if 'label' in df.columns:
         df['label'] = df['label'].astype(str).str.lower()
     
@@ -85,21 +81,6 @@ def load_model():
         return model, vectorizer
     except (FileNotFoundError, Exception):
         return None, None
-
-# Fungsi bantuan untuk mendapatkan kata terbanyak (Instruksi 2 & 5)
-def get_top_words(text_series, top_n=5):
-    all_text = " ".join(text_series.dropna().astype(str).tolist()).lower()
-    all_text = re.sub(r'[^a-z\s]', '', all_text)
-    words = all_text.split()
-    
-    # Stopwords sederhana bahasa Indonesia (bisa disesuaikan)
-    stopwords = {'dan', 'di', 'ke', 'dari', 'yang', 'untuk', 'ini', 'itu', 'dengan', 'pada', 'saya', 'ada', 'pelabuhan'}
-    words = [w for w in words if w not in stopwords and len(w) > 2]
-    
-    if not words: 
-        return "-"
-    common = Counter(words).most_common(top_n)
-    return ", ".join([w[0] for w in common])
 
 df_full = load_data()
 model, vectorizer = load_model()
@@ -192,55 +173,13 @@ st.markdown("---")
 # ==========================================
 # 7. BODY - PEMBUATAN TABS
 # ==========================================
-# Penambahan tab "Ringkasan Eksekutif" untuk menampilkan Tabel sesuai instruksi 2, 3, 4, 5
-tab1, tab2, tab3, tab4 = st.tabs([
-    "📋 Ringkasan Eksekutif", 
+tab1, tab2, tab3 = st.tabs([
     "📊 Visualisasi Data & Tren", 
     "☁️ WordCloud & Heatmap Keluhan", 
     "🤖 Prediksi Sentimen AI"
 ])
 
 with tab1:
-    st.markdown("### Ringkasan Data Tiap Pelabuhan")
-    st.markdown("Tabel ini memberikan rangkuman kualitas rating, tingkat kesibukan, dan kata kunci (umum, positif, dan negatif) yang paling sering disebutkan oleh pengunjung berdasarkan data yang sudah dibersihkan.")
-    
-    if df_working.empty:
-        st.info("Tidak ada data untuk direkap.")
-    else:
-        summary_data = []
-        for port in sorted(df_working['pelabuhan'].unique()):
-            port_df = df_working[df_working['pelabuhan'] == port]
-            
-            # Instruksi 3: review_rating untuk rating setiap pelabuhan
-            avg_rate = round(port_df['review_rating'].mean(), 2) if 'review_rating' in port_df.columns else "N/A"
-            tot_rev = len(port_df)
-            
-            # Instruksi 4: review_datetime_utc (tanggal) untuk melacak tren bulan tersibuk
-            monthly = port_df.groupby('bulan_tahun').size()
-            busy_month = monthly.idxmax() if not monthly.empty else "-"
-            
-            # Instruksi 2: review_text untuk menentukan kata sering muncul
-            top_umum = get_top_words(port_df['review_text'], 5) if 'review_text' in port_df.columns else "-"
-            
-            # Instruksi 5: label untuk memetakan kata positif dan negatif
-            if 'label' in port_df.columns and 'review_text' in port_df.columns:
-                df_pos = port_df[port_df['label'] == 'positif']
-                df_neg = port_df[port_df['label'] == 'negatif']
-                top_pos = get_top_words(df_pos['review_text'], 5)
-                top_neg = get_top_words(df_neg['review_text'], 5)
-            else:
-                top_pos, top_neg = "-", "-"
-                
-            summary_data.append([port, avg_rate, tot_rev, busy_month, top_umum, top_pos, top_neg])
-            
-        summary_df = pd.DataFrame(summary_data, columns=[
-            "Nama Pelabuhan", "Rata-rata Rating", "Total Ulasan", 
-            "Bulan Tersibuk", "Top 5 Kata (Umum)", "Top 5 Kata Positif", "Top 5 Kata Negatif"
-        ])
-        
-        st.dataframe(summary_df, use_container_width=True)
-
-with tab2:
     if df_working.empty:
         st.info("Pilih minimal satu pelabuhan di sidebar untuk menampilkan visualisasi grafik dan tren.")
     else:
@@ -290,7 +229,7 @@ with tab2:
             sns.despine(left=True, bottom=True)
             st.pyplot(fig_trend)
 
-with tab3:
+with tab2:
     if df_working.empty:
          st.info("Pilih minimal satu pelabuhan di sidebar untuk menampilkan analisis kata kunci dan heatmap.")
     else:
@@ -334,7 +273,7 @@ with tab3:
                 else:
                     st.success("Luar biasa! Tidak ada ulasan negatif (Rating 1 & 2) yang ditemukan dalam rentang waktu terfilter.")
 
-with tab4:
+with tab3:
     st.header("Sistem Uji Sentimen Real-Time")
     
     if model is None or vectorizer is None:
