@@ -36,7 +36,7 @@ logo_polibatam = load_logo()
 # 2. FUNGSI UNTUK MEMUAT DATA & MODEL
 # ==========================================
 @st.cache_data
-def load_data():
+def load_data(file_mtime):
     file_path = 'data_pelabuhan_cleaned.csv'
     if not os.path.exists(file_path):
         return None
@@ -82,7 +82,7 @@ def load_model():
     except (FileNotFoundError, Exception):
         return None, None
 
-df_full = load_data()
+df_full = load_data(csv_mtime)
 model, vectorizer = load_model()
 
 if df_full is None:
