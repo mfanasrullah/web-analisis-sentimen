@@ -35,7 +35,6 @@ logo_polibatam = load_logo()
 # ==========================================
 # 2. FUNGSI UNTUK MEMUAT DATA & MODEL
 # ==========================================
-@st.cache_data
 def load_data():
     file_path = 'data_pelabuhan_cleaned.csv'
     if not os.path.exists(file_path):
