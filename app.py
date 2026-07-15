@@ -37,7 +37,7 @@ logo_polibatam = load_logo()
 # ==========================================
 @st.cache_data
 def load_data():
-    file_path = 'data_pelabuhan.csv'
+    file_path = 'data_pelabuhan_cleaned.csv'
     if not os.path.exists(file_path):
         return None
         
@@ -84,7 +84,7 @@ df_full = load_data()
 model, vectorizer = load_model()
 
 if df_full is None:
-    st.error("File 'data_pelabuhan.csv' tidak ditemukan. Pastikan file berada di direktori yang sama.")
+    st.error("File 'data_pelabuhan_cleaned.csv' tidak ditemukan. Pastikan file berada di direktori yang sama.")
     st.stop()
 
 # ==========================================
