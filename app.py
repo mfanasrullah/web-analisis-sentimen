@@ -19,6 +19,16 @@ sns.set_palette("Blues_d")
 # ==========================================
 st.set_page_config(page_title="Dashboard Analisis Pelabuhan", layout="wide")
 
+# Menyembunyikan header, menu (termasuk ikon GitHub), dan footer
+hide_streamlit_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            header {visibility: hidden;}
+            footer {visibility: hidden;}
+            </style>
+            """
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 def load_logo():
     logo_path = 'image_0.png' 
     try:
